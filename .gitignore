@@ -12,3 +12,5 @@
 # Crash logs and backups
 /*.log
 *~
+
+package-lock.json
