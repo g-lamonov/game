@@ -34,3 +34,8 @@ export function timedRnd(dt: number, averageDelay: number): number {
 export function clamp(v: number, min: number, max: number): number {
     return v < min ? min : v > max ? max : v;
 }
+
+const timeDelta = Date.now() - performance.now();
+export function now(): number {
+    return performance.now() + timeDelta;
+}
