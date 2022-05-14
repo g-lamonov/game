@@ -9,6 +9,9 @@ import { loadImage } from "./graphics";
 import { Sprites } from "./Sprites";
 import { PhysicsEntity } from "./PhysicsEntity";
 import { Snowball } from "./Snowball";
+import { Environment } from "./World";
+import { particles, valueCurves, ParticleEmitter } from './Particles';
+import { rnd, rndItem, timedRnd } from './util';
 
 enum SpriteIndex {
     IDLE0 = 0,
@@ -23,6 +26,13 @@ enum SpriteIndex {
     FALL = 9
 }
 
+const groundColors = [
+    "#806057",
+    "#504336",
+    "#3C8376",
+    "#908784"
+];
+
 export class Player extends PhysicsEntity {
     private flying = false;
     private direction = 1;
@@ -36,12 +46,22 @@ export class Player extends PhysicsEntity {
     private closestNPC: NPC | null = null;
     public activeSpeechBubble: SpeechBubble | null = null;
     public isInDialog = false;
+    private dustEmitter: ParticleEmitter;
 
     public constructor(game: Game, x: number, y: number) {
         super(game, x, y, 0.5 * PIXEL_PER_METER, 1.85 * PIXEL_PER_METER);
         document.addEventListener("keydown", event => this.handleKeyDown(event));
         document.addEventListener("keyup", event => this.handleKeyUp(event));
         this.setMaxVelocity(MAX_PLAYER_SPEED);
+        this.dustEmitter = particles.createEmitter({
+            position: {x: this.x, y: this.y},
+            velocity: () => ({ x: rnd(-1, 1) * 26, y: rnd(0.7, 1) * 45 }),
+            color: () => rndItem(groundColors),
+            size: rnd(0.5, 1.5),
+            gravity: {x: 0, y: -100},
+            lifetime: () => rnd(0.5, 0.8),
+            alphaCurve: valueCurves.trapeze(0.05, 0.2)
+        });
     }
 
     public async load(): Promise<void> {
@@ -112,6 +132,8 @@ export class Player extends PhysicsEntity {
         super.update(dt);
 
         const world = this.game.world;
+        const wasFlying = this.flying;
+        const prevVelocity = this.getVelocityY();
 
         // Player movement
         if (!this.game.camera.isOnTarget()) {
@@ -153,6 +175,87 @@ export class Player extends PhysicsEntity {
             this.closestNPC = closestEntity;
         } else {
             this.closestNPC = null;
+        }
+
+        // Spawn random dust particles while walking
+        if (!this.flying && (Math.abs(this.getVelocityX()) > 1 || wasFlying)) {
+            if (timedRnd(dt, 0.2) || wasFlying) {
+                this.dustEmitter.setPosition(this.x, this.y);
+                const count = wasFlying ? Math.ceil(Math.abs(prevVelocity) / 5) : 1;
+                this.dustEmitter.emit(count);
+            }
+        }
+    }
+
+
+    /**
+     * If given coordinate collides with the world then the first free Y coordinate above is returned. This can
+     * be used to unstuck an object after a new position was set.
+     *
+     * @param x - X coordinate of current position.
+     * @param y - Y coordinate of current position.
+     * @return The Y coordinate of the ground below the given coordinate.
+     */
+    private pullOutOfGround(): number {
+        let pulled = 0;
+        if (this.getVelocityY() <= 0) {
+            const world = this.game.world;
+            const height = world.getHeight();
+            while (this.y < height && world.collidesWith(this.x, this.y)) {
+                pulled++;
+                this.y++;
+            }
+        }
+        return pulled;
+    }
+
+    /**
+     * If given coordinate collides with the world then the first free Y coordinate above is returned. This can
+     * be used to unstuck an object after a new position was set.
+     *
+     * @param x - X coordinate of current position.
+     * @param y - Y coordinate of current position.
+     * @return The Y coordinate of the ground below the given coordinate.
+     */
+    private pullOutOfCeiling(): number {
+        let pulled = 0;
+        const world = this.game.world;
+        while (this.y > 0 && world.collidesWith(this.x, this.y + this.height, [ Environment.PLATFORM ])) {
+            pulled++;
+            this.y--;
+        }
+        return pulled;
+    }
+
+    private pullOutOfWall(): number {
+        let pulled = 0;
+        const world = this.game.world;
+        if (this.getVelocityX() > 0) {
+            while (world.collidesWithVerticalLine(this.x + this.width / 2, this.y + this.height * 3 / 4,
+                    this.height / 2, [ Environment.PLATFORM ])) {
+                this.x--;
+                pulled++;
+            }
+        } else {
+            while (world.collidesWithVerticalLine(this.x - this.width / 2, this.y + this.height * 3 / 4,
+                    this.height / 2, [ Environment.PLATFORM ])) {
+                this.x++;
+                pulled++;
+            }
+        }
+        return pulled;
+    }
+
+    protected updatePosition(newX: number, newY: number): void {
+        this.x = newX;
+        this.y = newY;
+
+        // Check collision with the environment and correct player position and movement
+        if (this.pullOutOfGround() !== 0 || this.pullOutOfCeiling() !== 0) {
+            this.setVelocityY(0);
+        }
+        if (this.pullOutOfWall() !== 0) {
+            this.setVelocityX(0);
         }
     }
 }

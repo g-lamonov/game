@@ -6,6 +6,7 @@ import { Fire } from './Fire';
 import { clamp } from './util';
 import { Face } from './Face';
 import { Camera } from './Camera';
+import { FireGfx } from './FireGfx';
 
 export interface GameObject {
     draw(ctx: CanvasRenderingContext2D): void;
@@ -60,14 +61,15 @@ export class Game {
         this.gameObjects = [
             this.world = new World(this),
             particles,
-            this.player,
             this.fire,
+            this.player,
             new DummyNPC(this, 2570, 1245),
         ];
     }
 
     private async load() {
         await Face.load();
+        await FireGfx.load();
         for (const obj of this.gameObjects) {
             await obj.load();
         }
