@@ -12,5 +12,6 @@
 # Crash logs and backups
 /*.log
 *~
+*.psd
 
 package-lock.json

@@ -5,6 +5,7 @@ import { particles, Particles } from './Particles';
 import { Fire } from './Fire';
 import { clamp } from './util';
 import { Face } from './Face';
+import { Camera } from './Camera';
 
 export interface GameObject {
     draw(ctx: CanvasRenderingContext2D): void;
@@ -12,8 +13,8 @@ export interface GameObject {
     load(): Promise<void>;
 }
 
-// Max time delta. If game freezes for a few seconds for whatever reason, we don't want updates to jump too much.
-const MAX_DT = 100;
+// Max time delta (in s). If game freezes for a few seconds for whatever reason, we don't want updates to jump too much.
+const MAX_DT = 0.1;
 
 export class Game {
 
@@ -21,7 +22,17 @@ export class Game {
 
     private lastUpdateTime = Date.now();
 
-    private dt = 0;
+    /* Time delta in game logic time (0 while game is paused, elapsed seconds since last frame otherwise) */
+    public dt = 0;
+
+    /* Total game time (time passed while game not paused) */
+    public gameTime = 0;
+
+    /* Time delta since last frame */
+    public appDt = 0;
+
+    /* Total time elapsed since starting the game */
+    public appTime = 0;
 
     private boundLoop: () => void;
 
@@ -30,6 +41,8 @@ export class Game {
     private paused = false;
 
     public world: World;
+
+    public camera: Camera;
 
     public player: Player;
 
@@ -43,13 +56,13 @@ export class Game {
         this.player = new Player(this, 2656, 1270);
         this.fire = new Fire(this, 2450, 1170);
         this.particles = particles;
+        this.camera = new Camera(this.player);
         this.gameObjects = [
             this.world = new World(this),
+            particles,
             this.player,
             this.fire,
-            new DummyNPC(this, 2580, 1245),
-            particles,
-
+            new DummyNPC(this, 2570, 1245),
         ];
     }
 
@@ -74,15 +87,20 @@ export class Game {
     private update() {
         const prevTime = this.lastUpdateTime;
         this.lastUpdateTime = Date.now();
+        const realDt = (this.lastUpdateTime - prevTime) / 1000;
+        this.appDt = realDt;
+        this.appTime += realDt;
         if (this.paused) {
             this.dt = 0;
         } else {
-            this.dt = clamp((this.lastUpdateTime - prevTime) / 1000, 0, MAX_DT);
+            this.dt = clamp(realDt, 0, MAX_DT);
+            this.gameTime += this.dt;
         }
         // Update all game classes
         for (const obj of this.gameObjects) {
             obj.update(this.dt);
         }
+        this.camera.update(this.dt, this.gameTime);
     }
 
     private draw() {
@@ -94,18 +112,22 @@ export class Game {
 
         // Clear
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        ctx.fillStyle = "blue";
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Want more pixels!
         ctx.imageSmoothingEnabled = false;
+
+        // Center coordinate system
         ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
+
+        // Scale by three because everything was based on 480x300 canvas and now its three times larger
         ctx.scale(3, 3);
 
         // Draw stuff
-        ctx.translate(-this.player.x, this.player.y);
+        this.camera.applyTransform(ctx);
         for (const obj of this.gameObjects) {
             obj.draw(ctx);
         }
+        this.camera.renderCinematicBars(ctx);
 
         ctx.restore();
     }
@@ -129,6 +151,7 @@ export class Game {
         game.start();
         return game;
     }
+
 }
 
 Game.create().then(game => {
