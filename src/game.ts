@@ -4,6 +4,7 @@ import { DummyNPC } from './DummyNPC';
 import { particles, Particles } from './Particles';
 import { Fire } from './Fire';
 import { clamp } from './util';
+import { Face } from './Face';
 
 export interface GameObject {
     draw(ctx: CanvasRenderingContext2D): void;
@@ -48,10 +49,12 @@ export class Game {
             this.fire,
             new DummyNPC(this, 2580, 1245),
             particles,
+
         ];
     }
 
     private async load() {
+        await Face.load();
         for (const obj of this.gameObjects) {
             await obj.load();
         }
@@ -126,7 +129,6 @@ export class Game {
         game.start();
         return game;
     }
-
 }
 
 Game.create().then(game => {
