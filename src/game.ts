@@ -1,27 +1,35 @@
-
-interface GameObject {
-    draw(dt: number): void;
+export interface GameObject {
+    draw(ctx: CanvasRenderingContext2D): void;
     update(dt: number): void;
+    load(): Promise<void>;
 }
 
 export class Game {
-
     private canvas: HTMLCanvasElement;
-
-    private lastUpdateTime: number;
-
+    private lastUpdateTime = Date.now();;
     private dt: number = 0;
-
     private boundLoop: () => void;
-
     private gameObjects: GameObject[] = [];
+    private paused = false;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
-        this.lastUpdateTime = Date.now();
         this.boundLoop = this.loop.bind(this);
+        this.gameObjects = [
+            // TODO
+        ];
+    }
+
+    // @ts-ignore
+    private async load() {
+        for (const obj of this.gameObjects) {
+            await obj.load();
+        }
+    }
+
+    private start() {
+        this.lastUpdateTime = Date.now();
         this.loop();
-        this.gameObjects = [];
     }
 
     private loop() {
@@ -33,11 +41,15 @@ export class Game {
     private update() {
         const prevTime = this.lastUpdateTime;
         this.lastUpdateTime = Date.now();
-        const dt = this.lastUpdateTime - prevTime;
-        this.dt = dt;
-
+        if (this.paused) {
+            this.dt = 0;
+        } else {
+            const dt = this.lastUpdateTime - prevTime;
+            this.dt = dt;
+        }
+        // Update all game classes
         for (const obj of this.gameObjects) {
-            obj.update(dt);
+            obj.update(this.dt);
         }
     }
 
@@ -47,18 +59,41 @@ export class Game {
             return;
         }
 
+        // Clear
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = "#" + Math.random().toString(16).substr(-6);
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (this.dt > 0) {
+            ctx.fillStyle = "#" + Math.random().toString(16).substr(-6);
+        }
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Draw stuff
         for (const obj of this.gameObjects) {
-            obj.draw(this.dt);
+            obj.draw(ctx);
         }
     }
 
+    public togglePause(paused = !this.paused) {
+        this.paused = paused;
+    }
+
+    public pause() {
+        this.togglePause(true);
+    }
+
+    public resume() {
+        this.togglePause(false);
+    }
+
+    public static async create(): Promise<Game> {
+        const canvas = document.querySelector<HTMLCanvasElement>("#gameCanvas")!;
+        const game = new Game(canvas);
+        await game.load();
+        game.start();
+        return game;
+    }
 
 }
 
-const canvas = document.querySelector<HTMLCanvasElement>("#gameCanvas")!;
-const game = new Game(canvas);
-(window as any).game = game;
+Game.create().then(game => {
+    (window as any).game = game;
+});
