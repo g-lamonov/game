@@ -15,9 +15,8 @@ export abstract class Entity implements GameObject {
         public height = 0
     ) {}
 
-    // @ts-ignore
     async load(): Promise<void> {
-        // ...
+        // set width/height based on loaded sprite?
     }
 
     abstract draw(ctx: CanvasRenderingContext2D): void;
@@ -51,4 +50,5 @@ export abstract class Entity implements GameObject {
         });
         return entitiesInRange;
     }
+
 }

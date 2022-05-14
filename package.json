@@ -25,6 +25,7 @@
     "webpack-dev-server": "3.11.3"
   },
   "dependencies": {
+    "rxjs": "^6.6.7",
     "tslib": "^2.4.0"
   }
 }

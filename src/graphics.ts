@@ -1,4 +1,3 @@
-// @ts-ignore
 export async function loadImage(fileName: string): Promise<HTMLImageElement> {
     const img = new Image();
     return new Promise<HTMLImageElement>((resolve, reject) => {
